@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full bg-slate-950 text-slate-100 select-none">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Le Jeu de l'Oie</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800;900&family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            cinzel: ['Cinzel', 'serif'],
+            sans: ['Montserrat', 'sans-serif'],
+          },
+          colors: {
+            goldMain: '#f59e0b',
+            goldLight: '#fef08a',
+            goldDark: '#b45309'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background: radial-gradient(circle at 50% 20%, #0f172a 0%, #0a0e1a 60%, #02040a 100%);
+      background-attachment: fixed;
+    }
+
+    .glass-panel {
+      background: rgba(10, 14, 26, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    }
+
+    .tile-card {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(217, 119, 6, 0.35);
+      box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+      transition: all 0.2s ease-out;
+    }
+
+    .tile-card:hover {
+      border-color: rgba(251, 191, 36, 0.9);
+      box-shadow: 0 0 14px rgba(245, 158, 11, 0.5);
+      transform: translateY(-1px);
+    }
+
+    .tile-active {
+      border-color: #f59e0b !important;
+      background: rgba(120, 53, 15, 0.9) !important;
+      box-shadow: 0 0 24px rgba(245, 158, 11, 0.9) !important;
+    }
+
+    /* Screen Shake & Flash FX */
+    .screen-shake {
+      animation: shake 0.45s cubic-bezier(.36,.07,.19,.97) both;
+    }
+    @keyframes shake {
+      10%, 90% { transform: translate3d(-4px, 2px, 0); }
+      20%, 80% { transform: translate3d(5px, -4px, 0); }
+      30%, 50%, 70% { transform: translate3d(-6px, 5px, 0); }
+      40%, 60% { transform: translate3d(6px, -5px, 0); }
+    }
+
+    .screen-flash {
+      animation: flashAnim 0.3s ease-out;
+    }
+    @keyframes flashAnim {
+      0% { background-color: rgba(255, 255, 255, 0.7); }
+      100% { background-color: transparent; }
+    }
+
+    /* 3D Dice */
+    .dice-container { perspective: 600px; }
+    .dice-cube {
+      width: 52px;
+      height: 52px;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.7s cubic-bezier(0.15, 0.85, 0.35, 1.2);
+    }
+    .dice-face {
+      position: absolute;
+      width: 52px;
+      height: 52px;
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      border: 2px solid #f59e0b;
+      border-radius: 12px;
+      box-shadow: inset 0 0 10px rgba(245, 158, 11, 0.4), 0 6px 14px rgba(0,0,0,0.8);
+      display: grid;
+      grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+      padding: 7px;
+      align-items: center;
+      justify-items: center;
+    }
+    .dice-dot {
+      width: 9px;
+      height: 9px;
+      background: radial-gradient(circle, #fef08a, #f59e0b);
+      border-radius: 50%;
+      box-shadow: 0 0 8px #f59e0b;
+    }
+
+    .face-1 { transform: rotateY(0deg) translateZ(26px); }
+    .face-2 { transform: rotateY(90deg) translateZ(26px); }
+    .face-3 { transform: rotateX(-90deg) translateZ(26px); }
+    .face-4 { transform: rotateX(90deg) translateZ(26px); }
+    .face-5 { transform: rotateY(-90deg) translateZ(26px); }
+    .face-6 { transform: rotateY(180deg) translateZ(26px); }
+
+    .gem-pawn {
+      filter: drop-shadow(0 8px 12px rgba(0,0,0,0.85));
+      will-change: transform;
+    }
+
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: rgba(10, 14, 26, 0.8); }
+    ::-webkit-scrollbar-thumb { background: #f59e0b; border-radius: 3px; }
+  </style>
+</head>
+
+<body class="h-full font-sans antialiased flex flex-col justify-between overflow-x-hidden">
+
+  <!-- FLASH OVERLAY -->
+  <div id="flash-overlay" class="fixed inset-0 pointer-events-none z-50"></div>
+
+  <!-- HEADER HUD -->
+  <header class="w-full px-4 py-3 z-20 glass-panel border-b border-amber-500/40 flex justify-between items-center shadow-xl">
+    <div class="flex items-center gap-3">
+      <div class="w-11 h-11 rounded-full bg-gradient-to-tr from-amber-600 via-yellow-400 to-amber-200 p-0.5 shadow-lg shadow-amber-500/40 flex items-center justify-center">
+        <div class="w-full h-full bg-slate-950 rounded-full flex items-center justify-center text-amber-300 font-cinzel font-black text-2xl">
+          🪿
+        </div>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-cinzel text-xl sm:text-2xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-amber-400 to-amber-500 drop-shadow">
+            Le Jeu de l'Oie
+          </h1>
+          <span class="hidden sm:inline-block px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-[10px] font-bold text-amber-300 tracking-wider">
+            Édition Multijoueur & IA
+          </span>
+        </div>
+        <p class="text-[10px] sm:text-xs text-amber-200/70 font-semibold">Plateau Interactif avec Personnalisation de Skins</p>
+      </div>
+    </div>
+
+    <!-- HUD Controls -->
+    <div class="flex items-center gap-2 sm:gap-3">
+      <!-- Speed selector -->
+      <div class="hidden sm:flex items-center bg-slate-900/90 border border-amber-500/30 rounded-lg p-1 text-xs">
+        <span class="text-[10px] text-amber-300/80 px-1.5 font-bold">Vitesse:</span>
+        <button onclick="setGameSpeed(380)" id="speed-slow" class="px-2 py-0.5 rounded text-[11px] text-slate-400 hover:text-white">Cinéma</button>
+        <button onclick="setGameSpeed(200)" id="speed-normal" class="px-2 py-0.5 rounded text-[11px] bg-amber-500 text-slate-950 font-bold">Normale</button>
+        <button onclick="setGameSpeed(80)" id="speed-fast" class="px-2 py-0.5 rounded text-[11px] text-slate-400 hover:text-white">Rapide</button>
+      </div>
+
+      <button onclick="toggleAudio()" id="btn-audio" class="px-3 py-1.5 rounded-lg bg-slate-900/80 hover:bg-slate-800 border border-amber-500/40 text-amber-300 text-xs font-semibold flex items-center gap-2 transition">
+        <i id="audio-icon" class="fa-solid fa-volume-high text-amber-400"></i>
+        <span class="hidden md:inline">Sons</span>
+      </button>
+
+      <button onclick="openRulebook()" class="px-3 py-1.5 rounded-lg bg-amber-950/80 hover:bg-amber-900 border border-amber-500/60 text-yellow-300 text-xs font-semibold flex items-center gap-2 transition">
+        <i class="fa-solid fa-scroll text-amber-400"></i>
+        <span>Règles</span>
+      </button>
+
+      <button onclick="openSetupModal()" class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition shadow-lg shadow-amber-500/30">
+        <i class="fa-solid fa-user-gear"></i>
+        <span>Partie / Skins</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN VIEWPORT -->
+  <main class="flex-1 w-full max-w-7xl mx-auto p-2 sm:p-4 flex flex-col lg:flex-row items-center justify-center gap-6 relative z-10">
+
+    <!-- BOARD CONTAINER -->
+    <div class="relative flex-1 w-full flex items-center justify-center">
+      
+      <!-- Outer Glass Board Frame -->
+      <div id="board-container" class="glass-panel relative w-full max-w-[650px] aspect-square rounded-3xl p-3 sm:p-4 border-2 border-amber-500/50 flex flex-col justify-between overflow-hidden shadow-2xl">
+        
+        <!-- Corner Gold Accents -->
+        <div class="absolute top-2 left-2 w-8 h-8 border-t-2 border-l-2 border-amber-400/80 rounded-tl-md pointer-events-none"></div>
+        <div class="absolute top-2 right-2 w-8 h-8 border-t-2 border-r-2 border-amber-400/80 rounded-tr-md pointer-events-none"></div>
+        <div class="absolute bottom-2 left-2 w-8 h-8 border-b-2 border-l-2 border-amber-400/80 rounded-bl-md pointer-events-none"></div>
+        <div class="absolute bottom-2 right-2 w-8 h-8 border-b-2 border-r-2 border-amber-400/80 rounded-br-md pointer-events-none"></div>
+
+        <!-- 8x8 Spiral Grid Track -->
+        <div id="board-grid" class="grid grid-cols-8 grid-rows-8 gap-1.5 w-full h-full relative z-10">
+          <!-- Spiral tiles generated dynamically -->
+        </div>
+
+        <!-- Pawns Overlay Layer -->
+        <div id="pawns-layer" class="absolute inset-0 pointer-events-none z-30 p-3 sm:p-4"></div>
+
+        <!-- PARTICLE CANVAS EFFECT OVERLAY -->
+        <canvas id="fx-canvas" class="absolute inset-0 pointer-events-none z-40 w-full h-full"></canvas>
+
+        <!-- TRAP BANNER TOAST OVERLAY -->
+        <div id="trap-toast" class="absolute inset-x-4 top-1/2 -translate-y-1/2 z-50 pointer-events-none flex justify-center opacity-0 scale-90 transition-all duration-300">
+          <div class="glass-panel bg-slate-950/95 border-2 border-amber-400 text-amber-100 px-6 py-4 rounded-2xl shadow-2xl text-center max-w-sm backdrop-blur-xl">
+            <div id="toast-icon" class="text-4xl sm:text-5xl mb-2 animate-bounce">🔥</div>
+            <h3 id="toast-title" class="font-cinzel font-black text-base sm:text-lg text-yellow-300 tracking-wider">CASE BRÛLURE !</h3>
+            <p id="toast-desc" class="font-sans text-xs text-amber-100/90 mt-1 leading-relaxed">Les flammes de l'enfer vous font reculer de 5 cases !</p>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- RIGHT: CONTROLS & SIDE PANEL -->
+    <div class="w-full lg:w-80 flex flex-col gap-4">
+      
+      <!-- CURRENT TURN CARD -->
+      <div class="glass-panel rounded-2xl p-4 relative overflow-hidden">
+        <div class="text-center border-b border-amber-500/30 pb-2 mb-3">
+          <span class="text-[10px] font-bold uppercase tracking-widest text-amber-400">Tour Actuel</span>
+          <div id="current-player-display" class="font-cinzel text-lg font-extrabold text-amber-100 flex items-center justify-center gap-2 mt-1">
+            <span id="pawn-turn-skin" class="text-2xl drop-shadow">🪿</span>
+            <span id="pawn-turn-indicator" class="w-3.5 h-3.5 rounded-full bg-red-500 shadow-[0_0_10px_#ef4444] inline-block"></span>
+            <span id="player-turn-name">Joueur 1</span>
+          </div>
+        </div>
+
+        <!-- Roster Cards -->
+        <div id="players-roster" class="space-y-2 mb-4"></div>
+
+        <!-- Roll Button -->
+        <button id="btn-roll" onclick="rollDiceAction()" class="w-full py-3.5 px-4 bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600 hover:from-amber-500 hover:to-yellow-400 text-slate-950 font-cinzel font-black text-sm sm:text-base rounded-xl border border-yellow-200/80 shadow-[0_0_20px_rgba(245,158,11,0.5)] active:scale-95 transition-all flex items-center justify-center gap-3">
+          <i class="fa-solid fa-dice text-xl"></i>
+          <span>LANCER LE DÉ</span>
+        </button>
+      </div>
+
+      <!-- DICE TRAY CARD -->
+      <div class="glass-panel rounded-2xl p-4 flex flex-col items-center justify-center min-h-[120px] relative">
+        <span class="absolute top-2 left-3 text-[9px] font-bold tracking-wider text-amber-400/70 uppercase">Piste de Dé</span>
+        
+        <div class="flex items-center justify-center gap-4 my-auto pt-2">
+          <div class="dice-container">
+            <div id="dice-1" class="dice-cube">
+              <div class="dice-face face-1"><div class="dice-dot col-start-2 row-start-2"></div></div>
+              <div class="dice-face face-2"><div class="dice-dot col-start-1 row-start-1"></div><div class="dice-dot col-start-3 row-start-3"></div></div>
+              <div class="dice-face face-3"><div class="dice-dot col-start-1 row-start-1"></div><div class="dice-dot col-start-2 row-start-2"></div><div class="dice-dot col-start-3 row-start-3"></div></div>
+              <div class="dice-face face-4"><div class="dice-dot col-start-1 row-start-1"></div><div class="dice-dot col-start-3 row-start-1"></div><div class="dice-dot col-start-1 row-start-3"></div><div class="dice-dot col-start-3 row-start-3"></div></div>
+              <div class="dice-face face-5"><div class="dice-dot col-start-1 row-start-1"></div><div class="dice-dot col-start-3 row-start-1"></div><div class="dice-dot col-start-2 row-start-2"></div><div class="dice-dot col-start-1 row-start-3"></div><div class="dice-dot col-start-3 row-start-3"></div></div>
+              <div class="dice-face face-6"><div class="dice-dot col-start-1 row-start-1"></div><div class="dice-dot col-start-3 row-start-1"></div><div class="dice-dot col-start-1 row-start-2"></div><div class="dice-dot col-start-3 row-start-2"></div><div class="dice-dot col-start-1 row-start-3"></div><div class="dice-dot col-start-3 row-start-3"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="dice-result-text" class="text-xs font-cinzel font-bold text-amber-200/90 mt-2">Cliquez sur "Lancer le dé"</div>
+      </div>
+
+      <!-- EVENT LOG JOURNAL -->
+      <div class="glass-panel rounded-2xl p-3 flex flex-col h-36">
+        <div class="text-[10px] font-bold uppercase tracking-wider text-amber-400 mb-1.5 flex items-center gap-1.5">
+          <i class="fa-solid fa-scroll"></i> Journal de la Partie
+        </div>
+        <div id="game-journal" class="flex-1 overflow-y-auto space-y-1 text-xs text-slate-300 pr-1">
+          <div class="italic text-amber-300/60">Bienvenue dans Le Jeu de l'Oie. Configurez vos skins et jouez !</div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+
+  <!-- MODAL: SETUP PLAYERS & SKINS -->
+  <div id="modal-setup" class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4">
+    <div class="glass-panel border-2 border-amber-500/60 rounded-3xl max-w-xl w-full p-5 sm:p-6 text-slate-100 shadow-2xl space-y-5 max-h-[90vh] flex flex-col">
+      
+      <div class="text-center border-b border-amber-500/30 pb-3">
+        <h2 class="font-cinzel font-extrabold text-xl text-yellow-300 tracking-wider">🎮 PREPARATION DE LA PARTIE</h2>
+        <p class="text-xs text-amber-200/70 mt-1">Choisissez le nombre de joueurs, leurs skins d'avatars et les Robots IA</p>
+      </div>
+
+      <!-- Number of Players Selector -->
+      <div class="flex items-center justify-between bg-slate-900/90 p-3 rounded-xl border border-amber-500/30">
+        <span class="text-xs font-bold text-amber-200">Nombre total de joueurs :</span>
+        <div class="flex items-center gap-2">
+          <button onclick="setPlayerCount(2)" id="count-btn-2" class="px-3.5 py-1.5 rounded-lg font-bold text-xs bg-amber-500 text-slate-950 shadow-md">2 Joueurs</button>
+          <button onclick="setPlayerCount(3)" id="count-btn-3" class="px-3.5 py-1.5 rounded-lg font-bold text-xs bg-slate-800 text-slate-300 hover:text-white">3 Joueurs</button>
+          <button onclick="setPlayerCount(4)" id="count-btn-4" class="px-3.5 py-1.5 rounded-lg font-bold text-xs bg-slate-800 text-slate-300 hover:text-white">4 Joueurs</button>
+        </div>
+      </div>
+
+      <!-- Player Customization Cards Container -->
+      <div id="setup-players-container" class="space-y-3 overflow-y-auto flex-1 pr-1">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <div class="pt-2 border-t border-amber-500/30 flex gap-3">
+        <button onclick="applyPlayerSetup()" class="w-full py-3.5 bg-gradient-to-r from-amber-600 via-yellow-500 to-amber-600 hover:from-amber-500 hover:to-yellow-400 text-slate-950 font-cinzel font-black text-sm rounded-xl shadow-[0_0_20px_rgba(245,158,11,0.5)] transition-all">
+          🚀 LANCER LA PARTIE
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL: RULEBOOK -->
+  <div id="modal-rulebook" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 hidden">
+    <div class="glass-panel border-2 border-amber-500/60 rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl text-slate-100 overflow-hidden">
+      <div class="bg-slate-900/90 text-amber-300 p-4 border-b border-amber-500/30 flex justify-between items-center">
+        <div class="flex items-center gap-2 font-cinzel font-extrabold text-base sm:text-lg">
+          <i class="fa-solid fa-book-journal-whills text-amber-400"></i>
+          <span>RÈGLES DU JEU DE L'OIE</span>
+        </div>
+        <button onclick="closeRulebook()" class="text-amber-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+
+      <div class="p-5 overflow-y-auto text-xs sm:text-sm leading-relaxed space-y-4">
+        <div>
+          <h4 class="font-cinzel font-bold text-amber-300 text-sm mb-1">🎯 Objectif</h4>
+          <p class="text-slate-300">Atteignez exactement le **Sanctuaire de l'Oie (Case 63)**. Si votre lancer dépasse 63, vous **rebondissez en arrière** du surplus !</p>
+        </div>
+
+        <div class="space-y-2">
+          <h4 class="font-cinzel font-bold text-amber-300 text-sm">🌌 Cases Spéciales</h4>
+          <ul class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <li class="p-2 rounded bg-amber-950/30 border border-amber-500/30"><strong>🪿 Oies Dorées (9, 18, 27, 36, 45, 54) :</strong> Re-déplacement du double du jet de dé !</li>
+            <li class="p-2 rounded bg-yellow-950/30 border border-yellow-500/30"><strong>🌉 Le Pont (6) :</strong> Téléportation directe en Case 12.</li>
+            <li class="p-2 rounded bg-emerald-950/30 border border-emerald-500/30"><strong>💎 Trésor (14) :</strong> Reçoit un bonus de +3 cases.</li>
+            <li class="p-2 rounded bg-blue-950/30 border border-blue-500/30"><strong>🏨 L'Hôtel (19) :</strong> Repos forcé. Passe 1 tour.</li>
+            <li class="p-2 rounded bg-red-950/30 border border-red-500/30"><strong>🔥 Brûlure (22) :</strong> Explosion ! Recule de 5 cases.</li>
+            <li class="p-2 rounded bg-cyan-950/30 border border-cyan-500/30"><strong>🌊 La Cascade (31) :</strong> Torrent glacé ! Projeté 6 cases en arrière.</li>
+            <li class="p-2 rounded bg-sky-950/30 border border-sky-500/30"><strong>🌪️ Tempête (35) :</strong> Tornade ! Recule de 4 cases.</li>
+            <li class="p-2 rounded bg-indigo-950/30 border border-indigo-500/30"><strong>🌀 Labyrinthe (42) :</strong> Déformation ! Retour en Case 30.</li>
+            <li class="p-2 rounded bg-slate-900/50 border border-slate-700"><strong>⛓️ La Prison (52) :</strong> Enfermé ! Passe 1 tour.</li>
+            <li class="p-2 rounded bg-purple-950/30 border border-purple-500/30"><strong>💀 Tête de Mort (58) :</strong> Retour immédiat en Case 0.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="p-3 bg-slate-900/60 border-t border-amber-500/30 text-center">
+        <button onclick="closeRulebook()" class="px-6 py-2 bg-amber-600 hover:bg-amber-500 text-slate-950 font-cinzel font-bold text-xs rounded-lg">
+          Fermer
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL: VICTORY -->
+  <div id="modal-victory" class="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg flex items-center justify-center p-4 hidden">
+    <div class="glass-panel border-2 border-amber-400 p-8 rounded-3xl max-w-md w-full text-center relative z-10 shadow-2xl space-y-5">
+      <div id="victory-skin-display" class="text-6xl mb-2 animate-bounce">🪿</div>
+      <div>
+        <h2 class="font-cinzel text-2xl font-black text-amber-200">VICTOIRE !</h2>
+        <p id="victory-player-name" class="text-yellow-300 font-bold text-lg mt-1">Le Joueur 1 remporte Le Jeu de l'Oie !</p>
+      </div>
+      <button onclick="closeVictoryModal(); openSetupModal();" class="w-full py-3.5 bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-cinzel font-black text-sm rounded-xl shadow-lg">
+        Recommencer une Partie
+      </button>
+    </div>
+  </div>
+
+
+  <!-- JAVASCRIPT ENGINE -->
+  <script>
+    /* 1. SPIRAL MAP COORDINATES (8x8 Grid Spiral Path 0 to 63) */
+    const SPIRAL_COORDS = [
+      {x:0, y:0}, {x:1, y:0}, {x:2, y:0}, {x:3, y:0}, {x:4, y:0}, {x:5, y:0}, {x:6, y:0}, {x:7, y:0},
+      {x:7, y:1}, {x:7, y:2}, {x:7, y:3}, {x:7, y:4}, {x:7, y:5}, {x:7, y:6}, {x:7, y:7},
+      {x:6, y:7}, {x:5, y:7}, {x:4, y:7}, {x:3, y:7}, {x:2, y:7}, {x:1, y:7}, {x:0, y:7},
+      {x:0, y:6}, {x:0, y:5}, {x:0, y:4}, {x:0, y:3}, {x:0, y:2}, {x:0, y:1},
+      {x:1, y:1}, {x:2, y:1}, {x:3, y:1}, {x:4, y:1}, {x:5, y:1}, {x:6, y:1},
+      {x:6, y:2}, {x:6, y:3}, {x:6, y:4}, {x:6, y:5}, {x:6, y:6},
+      {x:5, y:6}, {x:4, y:6}, {x:3, y:6}, {x:2, y:6}, {x:1, y:6},
+      {x:1, y:5}, {x:1, y:4}, {x:1, y:3}, {x:1, y:2},
+      {x:2, y:2}, {x:3, y:2}, {x:4, y:2}, {x:5, y:2},
+      {x:5, y:3}, {x:5, y:4}, {x:5, y:5},
+      {x:4, y:5}, {x:3, y:5}, {x:2, y:5},
+      {x:2, y:4}, {x:2, y:3},
+      {x:3, y:3}, {x:4, y:3}, {x:4, y:4}, {x:3, y:4}
+    ];
+
+    const GOOSE_TILES = [9, 18, 27, 36, 45, 54];
+
+    const SPECIAL_TILES = {
+      0:  { name: "Départ", icon: "🚩" },
+      6:  { name: "Le Pont", icon: "🌉", target: 12, desc: "Téléportation magique ! Avance directe en Case 12.", type: "portal" },
+      14: { name: "Trésor", icon: "💎", advance: 3, desc: "Coffre aux Trésors ! Avance de 3 cases supplémentaires.", type: "treasure" },
+      19: { name: "L'Hôtel", icon: "🏨", skipTurns: 1, desc: "Repos forcé à l'Hôtel. Vous passez 1 tour.", type: "hotel" },
+      22: { name: "Brûlure", icon: "🔥", moveBack: 5, desc: "BRÛLURE D'ENFER ! L'explosion vous fait reculer de 5 cases !", type: "fire" },
+      31: { name: "La Cascade", icon: "🌊", moveBack: 6, desc: "CASCADE GLACÉE ! Le torrent vous balaie de 6 cases en arrière !", type: "water" },
+      35: { name: "Tempête", icon: "🌪️", moveBack: 4, desc: "TEMPÊTE / TORNADE ! Les éclairs vous projettent 4 cases en arrière !", type: "tornado" },
+      42: { name: "Labyrinthe", icon: "🌀", target: 30, desc: "Perdu dans le Labyrinthe ! Retour en Case 30.", type: "labyrinth" },
+      52: { name: "La Prison", icon: "⛓️", skipTurns: 1, desc: "Enfermé en Prison ! Vous passez 1 tour.", type: "prison" },
+      58: { name: "Tête de Mort", icon: "💀", target: 0, desc: "MALÉDICTION ! Retour immédiat à la Case 0 (Départ).", type: "reaper" },
+      63: { name: "Arrivée", icon: "🏆", desc: "Arrivée dans le Sanctuaire de l'Oie ! Victoire !" }
+    };
+
+    GOOSE_TILES.forEach(t => {
+      SPECIAL_TILES[t] = { name: "Oie Dorée", icon: "🪿", isGoose: true, type: "goose" };
+    });
+
+    const AVAILABLE_SKINS = ["🪿", "🚀", "🦁", "🤖", "👑", "🐉", "🧙", "🦄", "🐱", "🦊"];
+
+    /* 2. GAME STATE */
+    let players = [
+      { id: 0, name: "Joueur 1", skin: "🪿", color: "#ef4444", colorGlow: "rgba(239, 68, 68, 0.8)", position: 0, skipTurns: 0, isBot: false },
+      { id: 1, name: "Robot IA 1", skin: "🤖", color: "#3b82f6", colorGlow: "rgba(59, 130, 246, 0.8)", position: 0, skipTurns: 0, isBot: true },
+      { id: 2, name: "Joueur 3", skin: "🦁", color: "#10b981", colorGlow: "rgba(16, 185, 129, 0.8)", position: 0, skipTurns: 0, isBot: false },
+      { id: 3, name: "Robot IA 2", skin: "🚀", color: "#a855f7", colorGlow: "rgba(168, 85, 247, 0.8)", position: 0, skipTurns: 0, isBot: true }
+    ];
+
+    let activePlayerCount = 2;
+    let currentPlayerIndex = 0;
+    let isMoving = false;
+    let audioEnabled = true;
+    let stepDelay = 200; // Hop duration in ms
+
+    function setGameSpeed(speedMs) {
+      stepDelay = speedMs;
+      document.getElementById('speed-slow').className = speedMs === 380 ? 'px-2 py-0.5 rounded text-[11px] bg-amber-500 text-slate-950 font-bold' : 'px-2 py-0.5 rounded text-[11px] text-slate-400 hover:text-white';
+      document.getElementById('speed-normal').className = speedMs === 200 ? 'px-2 py-0.5 rounded text-[11px] bg-amber-500 text-slate-950 font-bold' : 'px-2 py-0.5 rounded text-[11px] text-slate-400 hover:text-white';
+      document.getElementById('speed-fast').className = speedMs === 80 ? 'px-2 py-0.5 rounded text-[11px] bg-amber-500 text-slate-950 font-bold' : 'px-2 py-0.5 rounded text-[11px] text-slate-400 hover:text-white';
+    }
+
+    /* 3. SYNTHESIZED WEB AUDIO API AUDIO ENGINE */
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    function toggleAudio() {
+      audioEnabled = !audioEnabled;
+      document.getElementById('audio-icon').className = audioEnabled 
+        ? "fa-solid fa-volume-high text-amber-400" 
+        : "fa-solid fa-volume-xmark text-slate-500";
+    }
+
+    function playSound(type) {
+      if (!audioEnabled) return;
+      try {
+        initAudio();
+        const now = audioCtx.currentTime;
+
+        if (type === 'hop') {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(460, now);
+          osc.frequency.exponentialRampToValueAtTime(200, now + 0.08);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.08);
+
+        } else if (type === 'dice') {
+          for (let i = 0; i < 4; i++) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(300 + Math.random() * 350, now + i * 0.04);
+            gain.gain.setValueAtTime(0.15, now + i * 0.04);
+            gain.gain.linearRampToValueAtTime(0.01, now + i * 0.04 + 0.03);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now + i * 0.04);
+            osc.stop(now + i * 0.04 + 0.03);
+          }
+
+        } else if (type === 'fire') {
+          const bufSize = audioCtx.sampleRate * 0.5;
+          const buffer = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+          const noise = audioCtx.createBufferSource();
+          noise.buffer = buffer;
+          const gain = audioCtx.createGain();
+          gain.gain.setValueAtTime(0.4, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+          noise.connect(gain);
+          gain.connect(audioCtx.destination);
+          noise.start(now);
+
+        } else if (type === 'thunder') {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(110, now);
+          osc.frequency.exponentialRampToValueAtTime(20, now + 0.6);
+          gain.gain.setValueAtTime(0.5, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.6);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.6);
+
+        } else if (type === 'bell') {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(220, now);
+          gain.gain.setValueAtTime(0.5, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 1.2);
+
+        } else if (type === 'water') {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(600, now);
+          osc.frequency.linearRampToValueAtTime(180, now + 0.5);
+          gain.gain.setValueAtTime(0.35, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.5);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(now);
+          osc.stop(now + 0.5);
+
+        } else if (type === 'portal') {
+          [350, 500, 750, 1100].forEach((f, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.frequency.setValueAtTime(f, now + i * 0.06);
+            gain.gain.setValueAtTime(0.2, now + i * 0.06);
+            gain.gain.linearRampToValueAtTime(0.01, now + i * 0.06 + 0.16);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now + i * 0.06);
+            osc.stop(now + i * 0.06 + 0.16);
+          });
+
+        } else if (type === 'goose') {
+          [750, 950, 1200, 1450].forEach((f, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(f, now + i * 0.05);
+            gain.gain.setValueAtTime(0.2, now + i * 0.05);
+            gain.gain.linearRampToValueAtTime(0.01, now + i * 0.05 + 0.14);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now + i * 0.05);
+            osc.stop(now + i * 0.05 + 0.14);
+          });
+
+        } else if (type === 'fanfare') {
+          const notes = [523.25, 659.25, 783.99, 1046.50];
+          notes.forEach((f, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(f, now + i * 0.14);
+            gain.gain.setValueAtTime(0.3, now + i * 0.14);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.14 + 0.38);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now + i * 0.14);
+            osc.stop(now + i * 0.14 + 0.38);
+          });
+        }
+      } catch (e) { console.warn("Audio error", e); }
+    }
+
+    /* 4. CANVAS PARTICLE ENGINE (60 FPS) */
+    let fxCanvas, fxCtx;
+    let particles = [];
+
+    function initFXCanvas() {
+      fxCanvas = document.getElementById('fx-canvas');
+      fxCtx = fxCanvas.getContext('2d');
+      resizeFXCanvas();
+      window.addEventListener('resize', resizeFXCanvas);
+      requestAnimationFrame(fxLoop);
+    }
+
+    function resizeFXCanvas() {
+      const rect = document.getElementById('board-container').getBoundingClientRect();
+      fxCanvas.width = rect.width;
+      fxCanvas.height = rect.height;
+    }
+
+    function getTileCoords(tileIndex) {
+      const rect = document.getElementById('board-container').getBoundingClientRect();
+      const cellW = rect.width / 8;
+      const cellH = rect.height / 8;
+      const coord = SPIRAL_COORDS[tileIndex] || {x:0, y:0};
+      return {
+        x: coord.x * cellW + cellW / 2,
+        y: coord.y * cellH + cellH / 2
+      };
+    }
+
+    function triggerFireFX(tileIdx) {
+      const pos = getTileCoords(tileIdx);
+      for (let i = 0; i < 110; i++) {
+        particles.push({
+          type: 'fire',
+          x: pos.x + (Math.random() * 20 - 10),
+          y: pos.y + (Math.random() * 20 - 10),
+          vx: Math.random() * 5 - 2.5,
+          vy: -Math.random() * 6 - 2,
+          size: Math.random() * 10 + 4,
+          color: ['#ef4444', '#f97316', '#eab308', '#dc2626'][Math.floor(Math.random() * 4)],
+          life: 1.0, decay: Math.random() * 0.03 + 0.015
+        });
+      }
+    }
+
+    function triggerTornadoFX(tileIdx) {
+      const pos = getTileCoords(tileIdx);
+      for (let i = 0; i < 90; i++) {
+        particles.push({
+          type: 'tornado',
+          cx: pos.x, cy: pos.y,
+          angle: Math.random() * Math.PI * 2,
+          radius: Math.random() * 34 + 8,
+          speed: Math.random() * 0.15 + 0.08,
+          size: Math.random() * 6 + 2,
+          color: ['#38bdf8', '#0284c7', '#f0f9ff', '#94a3b8'][Math.floor(Math.random() * 4)],
+          life: 1.0, decay: Math.random() * 0.02 + 0.01
+        });
+      }
+    }
+
+    function triggerWaterSplashFX(tileIdx) {
+      const pos = getTileCoords(tileIdx);
+      for (let i = 0; i < 110; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 7 + 2;
+        particles.push({
+          type: 'water',
+          x: pos.x, y: pos.y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 2,
+          size: Math.random() * 7 + 3,
+          color: ['#06b6d4', '#0284c7', '#22d3ee', '#38bdf8', '#ffffff'][Math.floor(Math.random() * 5)],
+          life: 1.0, decay: Math.random() * 0.03 + 0.015
+        });
+      }
+    }
+
+    function triggerReaperFX(tileIdx) {
+      const pos = getTileCoords(tileIdx);
+      for (let i = 0; i < 90; i++) {
+        particles.push({
+          type: 'reaper',
+          x: pos.x + (Math.random() * 24 - 12),
+          y: pos.y + (Math.random() * 20 - 10),
+          vx: Math.random() * 2 - 1,
+          vy: -Math.random() * 3.5 - 1,
+          size: Math.random() * 8 + 4,
+          color: ['#a855f7', '#7e22ce', '#3b0764', '#c084fc'][Math.floor(Math.random() * 4)],
+          life: 1.0, decay: Math.random() * 0.02 + 0.01
+        });
+      }
+    }
+
+    function triggerGooseFeatherFX(tileIdx) {
+      const pos = getTileCoords(tileIdx);
+      for (let i = 0; i < 75; i++) {
+        particles.push({
+          type: 'feather',
+          x: pos.x, y: pos.y,
+          vx: Math.random() * 6 - 3,
+          vy: -Math.random() * 5 - 2,
+          size: Math.random() * 7 + 3,
+          color: ['#fbbf24', '#fef08a', '#d97706', '#ffffff'][Math.floor(Math.random() * 4)],
+          life: 1.0, decay: Math.random() * 0.02 + 0.01
+        });
+      }
+    }
+
+    function triggerLandingSparkles(x, y, color) {
+      for (let i = 0; i < 14; i++) {
+        particles.push({
+          type: 'sparkle',
+          x: x, y: y,
+          vx: Math.random() * 5 - 2.5,
+          vy: Math.random() * 5 - 2.5,
+          size: Math.random() * 4 + 2,
+          color: color || '#fef08a',
+          life: 1.0, decay: 0.06
+        });
+      }
+    }
+
+    function triggerVictoryConfetti() {
+      const rect = document.getElementById('board-container').getBoundingClientRect();
+      for (let i = 0; i < 220; i++) {
+        particles.push({
+          type: 'confetti',
+          x: Math.random() * rect.width,
+          y: -10,
+          vx: Math.random() * 4 - 2,
+          vy: Math.random() * 4 + 2,
+          size: Math.random() * 8 + 4,
+          color: ['#f59e0b', '#ef4444', '#3b82f6', '#10b981', '#a855f7', '#fef08a'][Math.floor(Math.random() * 6)],
+          life: 1.0, decay: 0.008
+        });
+      }
+    }
+
+    function fxLoop() {
+      if (fxCtx) {
+        fxCtx.clearRect(0, 0, fxCanvas.width, fxCanvas.height);
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.life -= p.decay;
+
+          if (p.life <= 0) {
+            particles.splice(i, 1);
+            continue;
+          }
+
+          fxCtx.save();
+          fxCtx.globalAlpha = p.life;
+
+          if (p.type === 'fire' || p.type === 'reaper' || p.type === 'feather' || p.type === 'sparkle') {
+            p.x += p.vx;
+            p.y += p.vy;
+            if (p.type === 'feather') p.vy += 0.05;
+            fxCtx.fillStyle = p.color;
+            fxCtx.beginPath();
+            fxCtx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+            fxCtx.fill();
+
+          } else if (p.type === 'water') {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.18;
+            fxCtx.fillStyle = p.color;
+            fxCtx.beginPath();
+            fxCtx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+            fxCtx.fill();
+
+          } else if (p.type === 'tornado') {
+            p.angle += p.speed;
+            const x = p.cx + Math.cos(p.angle) * p.radius;
+            const y = p.cy + Math.sin(p.angle) * p.radius - (1 - p.life) * 25;
+            fxCtx.fillStyle = p.color;
+            fxCtx.beginPath();
+            fxCtx.arc(x, y, p.size, 0, Math.PI * 2);
+            fxCtx.fill();
+
+          } else if (p.type === 'confetti') {
+            p.x += p.vx;
+            p.y += p.vy;
+            fxCtx.fillStyle = p.color;
+            fxCtx.fillRect(p.x, p.y, p.size, p.size);
+          }
+
+          fxCtx.restore();
+        }
+      }
+      requestAnimationFrame(fxLoop);
+    }
+
+    /* 5. SETUP & SETUP MODAL UI GENERATOR */
+    function setPlayerCount(count) {
+      activePlayerCount = count;
+      [2, 3, 4].forEach(c => {
+        const btn = document.getElementById(`count-btn-${c}`);
+        if (btn) {
+          btn.className = (c === count) 
+            ? "px-3.5 py-1.5 rounded-lg font-bold text-xs bg-amber-500 text-slate-950 shadow-md"
+            : "px-3.5 py-1.5 rounded-lg font-bold text-xs bg-slate-800 text-slate-300 hover:text-white";
+        }
+      });
+      renderSetupPlayersCards();
+    }
+
+    function renderSetupPlayersCards() {
+      const container = document.getElementById('setup-players-container');
+      container.innerHTML = '';
+
+      for (let i = 0; i < activePlayerCount; i++) {
+        const p = players[i];
+        const card = document.createElement('div');
+        card.className = "p-3 rounded-2xl bg-slate-900/90 border border-amber-500/30 flex flex-col gap-2.5 shadow-lg";
+
+        // Skin Selector HTML
+        let skinsHTML = AVAILABLE_SKINS.map(s => `
+          <button onclick="selectSkinForPlayer(${i}, '${s}')" class="w-8 h-8 rounded-lg text-lg flex items-center justify-center transition-transform hover:scale-110 ${p.skin === s ? 'bg-amber-500/30 border border-amber-400 ring-2 ring-amber-400' : 'bg-slate-950/80 border border-slate-700'}">
+            ${s}
+          </button>
+        `).join('');
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-3.5 h-3.5 rounded-full inline-block" style="background-color: ${p.color}; box-shadow: 0 0 8px ${p.colorGlow}"></span>
+              <span class="font-bold text-xs text-amber-200">Joueur ${i + 1}</span>
+            </div>
+            
+            <!-- Type Toggle -->
+            <div class="flex items-center bg-slate-950 rounded-lg p-0.5 border border-amber-500/30">
+              <button onclick="setPlayerType(${i}, false)" class="px-2.5 py-1 rounded-md text-[11px] font-bold ${!p.isBot ? 'bg-amber-500 text-slate-950' : 'text-slate-400 hover:text-white'}">Humain</button>
+              <button onclick="setPlayerType(${i}, true)" class="px-2.5 py-1 rounded-md text-[11px] font-bold ${p.isBot ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}">Bot IA</button>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <input type="text" id="setup-name-p${i}" value="${p.name}" onchange="players[${i}].name = this.value" placeholder="Nom du joueur" class="flex-1 bg-slate-950 border border-amber-500/40 rounded-xl px-3 py-1.5 text-xs text-amber-100 focus:outline-none focus:border-amber-400 font-bold">
+            <div class="flex items-center gap-1.5 bg-slate-950/80 p-1 rounded-xl border border-amber-500/30">
+              <span class="text-xs text-amber-400 font-bold px-1">Skin:</span>
+              <span class="text-xl px-1 drop-shadow">${p.skin}</span>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-1.5 overflow-x-auto pt-1 pb-0.5">
+            ${skinsHTML}
+          </div>
+        `;
+        container.appendChild(card);
+      }
+    }
+
+    function selectSkinForPlayer(playerIdx, skinEmoji) {
+      players[playerIdx].skin = skinEmoji;
+      renderSetupPlayersCards();
+    }
+
+    function setPlayerType(playerIdx, isBot) {
+      players[playerIdx].isBot = isBot;
+      if (isBot && !players[playerIdx].name.includes("Robot")) {
+        players[playerIdx].name = `Robot IA ${playerIdx + 1}`;
+      } else if (!isBot && players[playerIdx].name.includes("Robot")) {
+        players[playerIdx].name = `Joueur ${playerIdx + 1}`;
+      }
+      renderSetupPlayersCards();
+    }
+
+    function applyPlayerSetup() {
+      for (let i = 0; i < activePlayerCount; i++) {
+        const inputName = document.getElementById(`setup-name-p${i}`);
+        if (inputName && inputName.value.trim() !== "") {
+          players[i].name = inputName.value.trim();
+        }
+      }
+      closeSetupModal();
+      resetGame();
+    }
+
+    function openSetupModal() {
+      renderSetupPlayersCards();
+      document.getElementById('modal-setup').classList.remove('hidden');
+    }
+
+    function closeSetupModal() {
+      document.getElementById('modal-setup').classList.add('hidden');
+    }
+
+    /* 6. INITIALIZE BOARD & PAWNS */
+    window.onload = function() {
+      renderBoardGrid();
+      setPlayerCount(2);
+      renderPawnsLayer();
+      updatePlayerRosterUI();
+      updateTurnUI();
+      initFXCanvas();
+    };
+
+    function renderBoardGrid() {
+      const grid = document.getElementById('board-grid');
+      grid.innerHTML = '';
+
+      const matrix = Array(8).fill(null).map(() => Array(8).fill(null));
+      SPIRAL_COORDS.forEach((coord, idx) => { matrix[coord.y][coord.x] = idx; });
+
+      for (let y = 0; y < 8; y++) {
+        for (let x = 0; x < 8; x++) {
+          const tileIdx = matrix[y][x];
+          const cell = document.createElement('div');
+
+          if (tileIdx !== null) {
+            const spec = SPECIAL_TILES[tileIdx];
+            cell.id = `grid-tile-${tileIdx}`;
+            
+            let colorGlow = 'border-amber-500/30';
+            if (tileIdx === 63) colorGlow = 'border-yellow-400 border-2 bg-gradient-to-br from-amber-950 via-yellow-900 to-amber-950 shadow-[0_0_20px_rgba(245,158,11,0.6)]';
+            else if (spec && spec.isGoose) colorGlow = 'border-yellow-400/80 shadow-[0_0_10px_rgba(245,158,11,0.3)]';
+            else if (spec && spec.type === 'fire') colorGlow = 'border-red-500/80 shadow-[0_0_10px_rgba(239,68,68,0.4)]';
+            else if (spec && spec.type === 'water') colorGlow = 'border-cyan-400/80 shadow-[0_0_10px_rgba(6,182,212,0.4)]';
+            else if (spec && spec.type === 'tornado') colorGlow = 'border-sky-400/80 shadow-[0_0_10px_rgba(56,189,248,0.4)]';
+            else if (spec && spec.type === 'reaper') colorGlow = 'border-purple-500/80 shadow-[0_0_10px_rgba(168,85,247,0.4)]';
+
+            cell.className = `tile-card relative rounded-xl p-1 flex flex-col justify-between items-center ${colorGlow}`;
+
+            let iconHTML = spec ? `<span class="text-xs sm:text-sm drop-shadow">${spec.icon}</span>` : '';
+
+            cell.innerHTML = `
+              <div class="w-full flex justify-between items-center text-[9px] font-cinzel font-black text-amber-200/90 leading-none">
+                <span>${tileIdx === 0 ? 'START' : tileIdx}</span>
+                ${iconHTML}
+              </div>
+            `;
+          } else {
+            cell.className = 'invisible';
+          }
+          grid.appendChild(cell);
+        }
+      }
+    }
+
+    function renderPawnsLayer() {
+      const pawnsLayer = document.getElementById('pawns-layer');
+      pawnsLayer.innerHTML = '';
+
+      for (let i = 0; i < activePlayerCount; i++) {
+        const p = players[i];
+        const pawnEl = document.createElement('div');
+        pawnEl.id = `pawn-player-${p.id}`;
+        pawnEl.className = 'gem-pawn absolute w-7 h-7 sm:w-9 sm:h-9 flex items-center justify-center pointer-events-none z-30 transition-transform duration-75';
+        
+        pawnEl.innerHTML = `
+          <div class="relative w-full h-full flex items-center justify-center">
+            <div class="absolute inset-0 rounded-full blur-[4px]" style="background: ${p.colorGlow}"></div>
+            <div class="w-full h-full rounded-full border-2 border-yellow-300 flex items-center justify-center text-base sm:text-lg drop-shadow-lg relative z-10" style="background-color: ${p.color}">
+              ${p.skin}
+            </div>
+          </div>
+        `;
+        pawnsLayer.appendChild(pawnEl);
+      }
+      updatePawnsPositions();
+    }
+
+    function updatePawnsPositions() {
+      const gridRect = document.getElementById('board-grid').getBoundingClientRect();
+      const cellWidth = gridRect.width / 8;
+      const cellHeight = gridRect.height / 8;
+
+      for (let i = 0; i < activePlayerCount; i++) {
+        const p = players[i];
+        const coord = SPIRAL_COORDS[p.position];
+        const pawnEl = document.getElementById(`pawn-player-${p.id}`);
+
+        if (pawnEl && coord) {
+          const offsetX = (i % 2) * 6 - 3;
+          const offsetY = Math.floor(i / 2) * 6 - 3;
+          const posX = coord.x * cellWidth + (cellWidth / 2) - 18 + offsetX;
+          const posY = coord.y * cellHeight + (cellHeight / 2) - 18 + offsetY;
+
+          pawnEl.style.transform = `translate3d(${posX}px, ${posY}px, 0px)`;
+        }
+      }
+    }
+
+    window.onresize = () => {
+      updatePawnsPositions();
+      resizeFXCanvas();
+    };
+
+    /* 7. GAMEPLAY & MOVEMENT LOGIC */
+    async function rollDiceAction() {
+      if (isMoving) return;
+
+      const p = players[currentPlayerIndex];
+
+      if (p.skipTurns > 0) {
+        p.skipTurns--;
+        addJournalLog(`⏳ ${p.name} passe son tour (${p.skipTurns} tour(s) restant(s)).`);
+        nextTurn();
+        return;
+      }
+
+      isMoving = true;
+      document.getElementById('btn-roll').disabled = true;
+
+      playSound('dice');
+
+      const roll = Math.floor(Math.random() * 6) + 1;
+      animate3DDice(roll);
+
+      setTimeout(async () => {
+        document.getElementById('dice-result-text').innerText = `Lancer de dé : ${roll}`;
+        addJournalLog(`🎲 ${p.name} (${p.skin}) lance le dé et obtient : ${roll}.`);
+
+        await movePawnSteps(p, roll);
+      }, 700);
+    }
+
+    function animate3DDice(val) {
+      const dice = document.getElementById('dice-1');
+      const rotations = {
+        1: 'rotateY(0deg) rotateX(0deg)',
+        2: 'rotateY(-90deg) rotateX(0deg)',
+        3: 'rotateX(90deg) rotateY(0deg)',
+        4: 'rotateX(-90deg) rotateY(0deg)',
+        5: 'rotateY(90deg) rotateX(0deg)',
+        6: 'rotateY(180deg) rotateX(0deg)'
+      };
+
+      const randX = (Math.floor(Math.random() * 3) + 2) * 360;
+      const randY = (Math.floor(Math.random() * 3) + 2) * 360;
+
+      dice.style.transform = `rotateX(${randX}deg) rotateY(${randY}deg) ${rotations[val]}`;
+    }
+
+    async function movePawnSteps(player, steps, forceBackward = false) {
+      let currentPos = player.position;
+      let remaining = steps;
+      let direction = forceBackward ? -1 : 1;
+
+      while (remaining > 0) {
+        if (currentPos === 63 && !forceBackward) {
+          direction = -1;
+          addJournalLog(`↩️ Rebond sur la case 63 ! Le pion recule du surplus.`);
+        }
+
+        currentPos += direction;
+        if (currentPos < 0) currentPos = 0;
+        player.position = currentPos;
+
+        await animateSingleHop(player, currentPos);
+        remaining--;
+      }
+
+      updatePlayerRosterUI();
+      await evaluateTileEffect(player, steps);
+    }
+
+    function animateSingleHop(player, targetPos) {
+      return new Promise((resolve) => {
+        const pawnEl = document.getElementById(`pawn-player-${player.id}`);
+        const gridRect = document.getElementById('board-grid').getBoundingClientRect();
+        const cellW = gridRect.width / 8;
+        const cellH = gridRect.height / 8;
+
+        const targetCoord = SPIRAL_COORDS[targetPos];
+        const targetX = targetCoord.x * cellW + (cellW / 2) - 18;
+        const targetY = targetCoord.y * cellH + (cellH / 2) - 18;
+
+        const startTime = performance.now();
+        const duration = stepDelay;
+
+        function step(now) {
+          const elapsed = now - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          const arcHeight = Math.sin(progress * Math.PI) * 26;
+
+          pawnEl.style.transform = `translate3d(${targetX}px, ${targetY - arcHeight}px, 0px)`;
+
+          if (progress < 1) {
+            requestAnimationFrame(step);
+          } else {
+            playSound('hop');
+            triggerLandingSparkles(targetX + 18, targetY + 18, player.color);
+            resolve();
+          }
+        }
+        requestAnimationFrame(step);
+      });
+    }
+
+    /* 8. EVALUATE TILE EFFECTS */
+    async function evaluateTileEffect(player, lastRoll) {
+      const pos = player.position;
+      const spec = SPECIAL_TILES[pos];
+
+      const tileEl = document.getElementById(`grid-tile-${pos}`);
+      if (tileEl) tileEl.classList.add('tile-active');
+
+      if (pos === 63) {
+        addJournalLog(`🏆 ${player.name} ATTEINT LA CASE 63 ET REMPORTE LE JEU DE L'OIE !`);
+        playSound('fanfare');
+        triggerVictoryConfetti();
+        triggerVictoryModal(player);
+        isMoving = false;
+        document.getElementById('btn-roll').disabled = false;
+        return;
+      }
+
+      if (spec) {
+        // 🔥 CASE BRÛLURE (22)
+        if (spec.type === 'fire') {
+          showTrapToast("🔥 BRÛLURE !", spec.desc, "🔥");
+          playSound('fire');
+          triggerScreenShake();
+          triggerFireFX(pos);
+          addJournalLog(`🔥 ${player.name} brûle sur la case 22 et recule de 5 cases !`);
+          await new Promise(r => setTimeout(r, 1100));
+          if (tileEl) tileEl.classList.remove('tile-active');
+          await movePawnSteps(player, 5, true);
+          return;
+        }
+
+        // 🌊 LA CASCADE (31)
+        if (spec.type === 'water') {
+          showTrapToast("🌊 LA CASCADE !", spec.desc, "🌊");
+          playSound('water');
+          triggerWaterSplashFX(pos);
+          addJournalLog(`🌊 ${player.name} est balayé par la Cascade et recule de 6 cases !`);
+          await new Promise(r => setTimeout(r, 1100));
+          if (tileEl) tileEl.classList.remove('tile-active');
+          await movePawnSteps(player, 6, true);
+          return;
+        }
+
+        // 🌪️ CASE TEMPÊTE (35)
+        if (spec.type === 'tornado') {
+          showTrapToast("🌪️ TEMPÊTE !", spec.desc, "⚡");
+          playSound('thunder');
+          triggerLightningFlash();
+          triggerTornadoFX(pos);
+          addJournalLog(`🌪️ ${player.name} est pris dans la Tempête et recule de 4 cases !`);
+          await new Promise(r => setTimeout(r, 1100));
+          if (tileEl) tileEl.classList.remove('tile-active');
+          await movePawnSteps(player, 4, true);
+          return;
+        }
+
+        // 💀 TÊTE DE MORT (58)
+        if (spec.type === 'reaper') {
+          showTrapToast("💀 TÊTE DE MORT !", spec.desc, "💀");
+          playSound('bell');
+          triggerReaperFX(pos);
+          addJournalLog(`💀 ${player.name} subit la Malédiction ! Retour immédiat à la Case 0.`);
+          await new Promise(r => setTimeout(r, 1100));
+          player.position = 0;
+          updatePawnsPositions();
+        }
+
+        // 🌉 LE PONT (6)
+        if (spec.type === 'portal') {
+          showTrapToast("🌉 LE PONT !", spec.desc, "✨");
+          playSound('portal');
+          addJournalLog(`🌉 ${player.name} franchit Le Pont vers la Case 12.`);
+          await new Promise(r => setTimeout(r, 850));
+          player.position = 12;
+          updatePawnsPositions();
+        }
+
+        // 💎 TRÉSOR (14)
+        if (spec.type === 'treasure') {
+          showTrapToast("💎 TRÉSOR !", spec.desc, "💎");
+          playSound('goose');
+          addJournalLog(`💎 ${player.name} trouve un trésor et avance de 3 cases !`);
+          await new Promise(r => setTimeout(r, 850));
+          if (tileEl) tileEl.classList.remove('tile-active');
+          await movePawnSteps(player, 3);
+          return;
+        }
+
+        // 🌀 LABYRINTHE (42)
+        if (spec.type === 'labyrinth') {
+          showTrapToast("🌀 LABYRINTHE !", spec.desc, "🌀");
+          playSound('portal');
+          addJournalLog(`🌀 ${player.name} se perd dans le Labyrinthe et retourne en Case 30.`);
+          await new Promise(r => setTimeout(r, 850));
+          player.position = 30;
+          updatePawnsPositions();
+        }
+
+        // 🪿 OIE DORÉE
+        if (spec.isGoose) {
+          showTrapToast("🪿 OIE DORÉE !", `Avance encore du même jet de dé (${lastRoll} cases).`, "✨");
+          playSound('goose');
+          triggerGooseFeatherFX(pos);
+          addJournalLog(`🪿 Case Oie (${pos}) ! ${player.name} re-avance de ${lastRoll} cases.`);
+          await new Promise(r => setTimeout(r, 950));
+          if (tileEl) tileEl.classList.remove('tile-active');
+          await movePawnSteps(player, lastRoll);
+          return;
+        }
+
+        // ⛓️ PRISON / 🏨 HOTEL
+        if (spec.skipTurns) {
+          showTrapToast(spec.name, spec.desc, spec.icon);
+          player.skipTurns = spec.skipTurns;
+          addJournalLog(`🚨 ${player.name} passe ${spec.skipTurns} tour.`);
+        }
+      }
+
+      await new Promise(r => setTimeout(r, 300));
+      if (tileEl) tileEl.classList.remove('tile-active');
+
+      isMoving = false;
+      document.getElementById('btn-roll').disabled = false;
+      nextTurn();
+    }
+
+    /* 9. UI TOASTS & TURN MANAGEMENT */
+    function showTrapToast(title, desc, icon) {
+      const toast = document.getElementById('trap-toast');
+      document.getElementById('toast-title').innerText = title;
+      document.getElementById('toast-desc').innerText = desc;
+      document.getElementById('toast-icon').innerText = icon;
+
+      toast.classList.remove('opacity-0', 'scale-90');
+      toast.classList.add('opacity-100', 'scale-100');
+
+      setTimeout(() => {
+        toast.classList.remove('opacity-100', 'scale-100');
+        toast.classList.add('opacity-0', 'scale-90');
+      }, 1800);
+    }
+
+    function triggerScreenShake() {
+      const board = document.getElementById('board-container');
+      board.classList.add('screen-shake');
+      setTimeout(() => board.classList.remove('screen-shake'), 450);
+    }
+
+    function triggerLightningFlash() {
+      const overlay = document.getElementById('flash-overlay');
+      overlay.classList.add('screen-flash');
+      setTimeout(() => overlay.classList.remove('screen-flash'), 320);
+    }
+
+    function nextTurn() {
+      currentPlayerIndex = (currentPlayerIndex + 1) % activePlayerCount;
+      updateTurnUI();
+      updatePlayerRosterUI();
+
+      const nextP = players[currentPlayerIndex];
+      if (nextP.isBot && !isMoving) {
+        setTimeout(() => rollDiceAction(), 750);
+      }
+    }
+
+    function updateTurnUI() {
+      const p = players[currentPlayerIndex];
+      document.getElementById('player-turn-name').innerText = `${p.name} ${p.isBot ? '(IA)' : ''}`;
+      document.getElementById('pawn-turn-skin').innerText = p.skin;
+      const indicator = document.getElementById('pawn-turn-indicator');
+      indicator.style.backgroundColor = p.color;
+      indicator.style.boxShadow = `0 0 10px ${p.colorGlow}`;
+    }
+
+    function updatePlayerRosterUI() {
+      const roster = document.getElementById('players-roster');
+      roster.innerHTML = '';
+
+      for (let i = 0; i < activePlayerCount; i++) {
+        const p = players[i];
+        const isCurrent = (i === currentPlayerIndex);
+        const card = document.createElement('div');
+
+        card.className = `flex items-center justify-between p-2 rounded-xl border text-xs transition-all ${
+          isCurrent 
+            ? 'bg-amber-950/60 border-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.3)] ring-1 ring-amber-400/50' 
+            : 'bg-slate-900/60 border-amber-500/20 opacity-80'
+        }`;
+
+        let statusText = `Case : ${p.position}`;
+        if (p.skipTurns > 0) statusText = `⏳ Attente (${p.skipTurns}t)`;
+
+        card.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-lg drop-shadow">${p.skin}</span>
+            <span class="w-2.5 h-2.5 rounded-full inline-block" style="background-color: ${p.color}; box-shadow: 0 0 8px ${p.colorGlow}"></span>
+            <span class="font-bold text-amber-100">${p.name} ${p.isBot ? '<span class="text-[9px] text-amber-400">(IA)</span>' : ''}</span>
+          </div>
+          <span class="font-mono text-[11px] text-amber-300/90 font-semibold">${statusText}</span>
+        `;
+        roster.appendChild(card);
+      }
+    }
+
+    function addJournalLog(msg) {
+      const journal = document.getElementById('game-journal');
+      const entry = document.createElement('div');
+      entry.className = "border-b border-amber-500/10 pb-0.5 text-[11px] leading-relaxed";
+      entry.innerText = msg;
+      journal.prepend(entry);
+    }
+
+    /* Modals & Setup */
+    function openRulebook() { document.getElementById('modal-rulebook').classList.remove('hidden'); }
+    function closeRulebook() { document.getElementById('modal-rulebook').classList.add('hidden'); }
+
+    function resetGame() {
+      players.forEach(p => { p.position = 0; p.skipTurns = 0; });
+      currentPlayerIndex = 0;
+      isMoving = false;
+      renderPawnsLayer();
+      updatePlayerRosterUI();
+      updateTurnUI();
+      document.getElementById('game-journal').innerHTML = '<div class="italic text-amber-300/60">Nouvelle partie démarrée. Bonne chance !</div>';
+      
+      if (players[0].isBot) {
+        setTimeout(() => rollDiceAction(), 750);
+      }
+    }
+
+    function triggerVictoryModal(winner) {
+      document.getElementById('victory-skin-display').innerText = winner.skin;
+      document.getElementById('victory-player-name').innerText = `${winner.name} remporte Le Jeu de l'Oie !`;
+      document.getElementById('modal-victory').classList.remove('hidden');
+    }
+    function closeVictoryModal() { document.getElementById('modal-victory').classList.add('hidden'); }
+  </script>
+</body>
+</html>
